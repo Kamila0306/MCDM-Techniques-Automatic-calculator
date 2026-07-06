@@ -15,56 +15,49 @@ fuzzy_data = st.session_state.get('fuzzy_locked_results')
 
 has_active_data = topsis_data is not None or moora_data is not None or vikor_data is not None or fuzzy_data is not None
 
-# 🔥 [BULLETPROOF RANK REPAIR ENGINE] சப்ளையர் ஐடி தப்பாக இருந்தாலும் ஸ்கோரை வைத்து ரேங்க் போடும் மாஸ்டர் ஃபங்க்ஷன்
+# 🔥 [PERMANENT FIX] காலம் பெயர்களை துல்லியமாக கண்டறிந்து ரேங்க் எடுக்கும் இறுதி இன்ஜின்
 def get_clean_rank(df, id_col, sup_id, algo_name):
     df_temp = df.copy()
     
-    # 1. இந்த டேட்டாபிரேமில் இருக்கும் காலம் பெயர்களைத் தேடுகிறது
+    # 1. மாற்றுக்களின் ஐடியை (alternative / 16, 15...) கண்டறிதல்
     current_id_col = None
     if id_col in df_temp.columns:
         current_id_col = id_col
     else:
-        # 'alternative' பெயர் இல்லை என்றால், முதல் காலம் அல்லது லோயர் கேஸ் மேட்ச் செய்கிறது
         id_cols = [c for c in df_temp.columns if 'alter' in c.lower() or 'supp' in c.lower()]
-        if id_cols:
-            current_id_col = id_cols[0]
-        else:
-            current_id_col = df_temp.columns[0]
-            
-    # ஐடிக்களை ஸ்ட்ரிங் ஆக மாற்றி சுத்தப்படுத்துகிறது
+        current_id_col = id_cols[0] if id_cols else df_temp.columns[0]
+        
     df_temp[current_id_col] = df_temp[current_id_col].astype(str).str.strip()
     target_id_str = str(sup_id).strip()
     
-    # 2. ரேங்க் போடுவதற்கான ஸ்கோர் அல்லது பெர்ஃபார்மன்ஸ் காலமைத் தேடுகிறது
-    score_cols = [c for c in df_temp.columns if any(w in c.lower() for w in ['score', 'value', 'performance', 'assessment', 'cc ', 'q_', 'v_'])]
-    if not score_cols:
-        score_cols = [c for c in df_temp.columns if c != current_id_col]
+    # சப்ளையர் ரோ-வை மட்டும் தனியாக எடுக்கிறது
+    sub_df = df_temp[df_temp[current_id_col] == target_id_str]
+    if sub_df.empty:
+        return 1
         
+    # 2. 'Rank Position' அல்லது 'rank' என்று தொடங்கும் அசல் ரேங்க் காலம்களை தேடுகிறது
+    rank_cols = [c for c in df_temp.columns if 'rank' in c.lower() or 'position' in c.lower()]
+    if rank_cols:
+        val = str(sub_df[rank_cols[0]].values[0])
+        digits = ''.join([char for char in val if char.isdigit()])
+        if digits:
+            return int(digits)
+            
+    # 3. ஒருவேளை மேலேயும் சிக்கல் இருந்தால் 'CC Performance Score' போன்ற ஸ்கோரை வைத்து கணக்கிடுகிறது
+    score_cols = [c for c in df_temp.columns if any(w in c.lower() for w in ['score', 'value', 'performance', 'assessment', 'cc ', 'q_', 'v_'])]
     if score_cols:
         target_col = score_cols[0]
-        # VIKOR-க்கு மட்டும் குறைந்த ஸ்கோர் தான் பெஸ்ட் (Ascending=True), மத்தவற்றுக்கு அதிக ஸ்கோர் பெஸ்ட் (Ascending=False)
         is_ascending = True if 'vikor' in algo_name.lower() or 'q_' in target_col.lower() else False
         
         df_temp[target_col] = pd.to_numeric(df_temp[target_col], errors='coerce').fillna(0)
-        
-        # முழு டேபிளுக்கும் இங்கேயே புதிதாக ரேங்க் போடுகிறது!
         df_temp['Calculated_Rank'] = df_temp[target_col].rank(ascending=is_ascending, method='min')
         
-        # சப்ளையர் ஐடியை வைத்து ரேங்க்கை எடுக்கிறது
-        sub_df = df_temp[df_temp[current_id_col] == target_id_str]
-        if not sub_df.empty:
-            return int(sub_df['Calculated_Rank'].values[0])
+        # ரீ-ரேங்க் செய்து சரியாக திருப்பித் தருகிறது
+        if not is_ascending:
+            df_temp['Calculated_Rank'] = df_temp[target_col].rank(ascending=False, method='min')
             
-    # 3. ஒருவேளை காலம் மேட்ச் ஆகவில்லை என்றால், ரேங்க் காலம் இருக்கிறதா என்று பார்க்கிறது
-    rank_cols = [c for c in df_temp.columns if 'rank' in c.lower() or 'position' in c.lower()]
-    if rank_cols:
-        sub_df = df_temp[df_temp[current_id_col] == target_id_str]
-        if not sub_df.empty:
-            val = str(sub_df[rank_cols[0]].values[0])
-            digits = ''.join([char for char in val if char.isdigit()])
-            if digits:
-                return int(digits)
-                
+        return int(df_temp.loc[df_temp[current_id_col] == target_id_str, 'Calculated_Rank'].values[0])
+        
     return 1
 
 if not has_active_data:
@@ -91,7 +84,7 @@ else:
     for sup in all_suppliers:
         row = {id_col: sup}
         
-        # Each Algorithm Mapping via Safe Auto-Ranking System
+        # உங்களோட 4 அல்காரிதம்களையும் துல்லியமாக மேப் செய்கிறோம்
         row['TOPSIS'] = get_clean_rank(topsis_data, id_col, sup, 'topsis') if topsis_data is not None else 1
         row['MOORA'] = get_clean_rank(moora_data, id_col, sup, 'moora') if moora_data is not None else 1
         row['VIKOR'] = get_clean_rank(vikor_data, id_col, sup, 'vikor') if vikor_data is not None else 1
@@ -115,7 +108,6 @@ if df_ranks is not None:
     for col in technique_cols:
         df_ranks[col] = df_ranks[col].astype(int)
         
-    # நீங்கள் கேட்ட வரிசைப்படியே காலம்களை ரீ-ஆர்டர் செய்கிறோம்
     ordered_cols = [id_col] + technique_cols
     df_ranks = df_ranks[ordered_cols]
         
@@ -135,7 +127,6 @@ if df_ranks is not None:
     df_final_sorted.index = df_final_sorted.index + 1
     df_final_sorted.index.name = "Consensus Rank"
     
-    # UI-க்காக அசல் ரேங்க்குகளை மீட்டமைக்கிறோம்
     df_ui_table = df_final_sorted.copy()
     for col in technique_cols:
         df_ui_table[col] = num_alternatives + 1 - df_ui_table[col]
