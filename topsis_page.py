@@ -35,7 +35,7 @@ with st.expander("🔍 Click to view/verify your uploaded Dataset Matrix Values"
 
 st.markdown("---") # ஒரு சின்ன செப்பரேட்டர் கோடு
 # --- Existing Step 1 Code Starts Here ---
-st.subheader("⚖️ Step 1: Criteria Weights & Type Configuration")
+
 
 # 2. Extract AHP Weights directly from Multi-Format Safe Session Storage
 st.subheader("⚖️ Step 1: Criteria Weights & Type Configuration")
