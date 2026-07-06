@@ -15,13 +15,13 @@ fuzzy_data = st.session_state.get('fuzzy_locked_results')
 
 has_active_data = topsis_data is not None or moora_data is not None or vikor_data is not None or fuzzy_data is not None
 
-# 🔥 [SUPER FIX] எமோஜி மற்றும் டெக்ஸ்ட் கலந்திருந்தாலும் அசல் ரேங்க் நம்பரை மட்டும் பிரித்தெடுக்கும் இன்ஜின்
+# 🔥 [FIXED ENGINE] எரர் இல்லாத தூய்மையான ரேங்க் பிரித்தெடுக்கும் ஃபங்க்ஷன்
 def get_clean_rank(df, id_col, sup_id, algo_name):
     sub_df = df[df[id_col] == sup_id]
     if sub_df.empty:
         return 1
     
-    # 1. 'rank' வார்த்தை உள்ள காலம்களைத் தேடுகிறது (e.g., 'Rank Position')
+    # 1. 'rank' அல்லது 'position' வார்த்தை உள்ள காலம்களைத் தேடுகிறது (e.g., 'Rank Position')
     rank_cols = [c for c in df.columns if 'rank' in c.lower() or 'position' in c.lower()]
     if rank_cols:
         val = str(sub_df[rank_cols[0]].values[0])
@@ -30,24 +30,20 @@ def get_clean_rank(df, id_col, sup_id, algo_name):
         if digits:
             return int(digits)
             
-    # 2. ஒருவேளை ரேங்க் காலம் ஸ்ட்ரிங்காகவோ அல்லது ஸ்கோராகவோ இருந்தால், இங்கேயே புது ரேங்க் போடுகிறது!
+    # 2. ஒருவேளை ரேங்க் காலம் இல்லாமல் வெறும் ஸ்கோர்கள் மட்டும் இருந்தால், இங்கேயே ரேங்க் கணக்கிடுகிறது
     score_cols = [c for c in df.columns if any(w in c.lower() for w in ['score', 'value', 'performance', 'assessment', 'q_', 'v_']) or c not in [id_col]]
     if score_cols:
         target_col = score_cols[0]
-        # VIKOR-க்கு மட்டும் Ascending, மத்த எல்லாத்துக்கும் Descending ரேங்க்
-        ascending_order = True if 'vikor' in algo_name.lower() or 'q_' in target_col.lower() else False
         
-        # ஸ்ட்ரிங் டேட்டாக்களை நம்பராக மாற்றுகிறது
+        # VIKOR-க்கு மட்டும் குறைந்த ஸ்கோர் தான் பெஸ்ட் (Ascending=True), மத்தவற்றுக்கு அதிக ஸ்கோர் பெஸ்ட் (Ascending=False)
+        is_ascending = True if 'vikor' in algo_name.lower() or 'q_' in target_col.lower() else False
+        
         temp_df = df[[id_col, target_col]].copy()
         temp_df[target_col] = pd.to_numeric(temp_df[target_col], errors='coerce').fillna(0)
         
-        temp_df['Calculated_Rank'] = temp_df[target_col].rank(ascending=ascending_order, method='min', ascending_order=not ascending_order)
-        # மெத்தட் சரிசெய்தல்
-        if ascending_order:
-            temp_df['Calculated_Rank'] = temp_df[target_col].rank(ascending=True, method='min')
-        else:
-            temp_df['Calculated_Rank'] = temp_df[target_col].rank(ascending=False, method='min')
-            
+        # 🛠️ எரர் சரிசெய்யப்பட்ட தூய்மையான லைன்:
+        temp_df['Calculated_Rank'] = temp_df[target_col].rank(ascending=is_ascending, method='min')
+        
         return int(temp_df.loc[temp_df[id_col] == sup_id, 'Calculated_Rank'].values[0])
         
     return 1
@@ -65,7 +61,7 @@ if not has_active_data:
     id_col = "Supplier"
     st.info("💡 **Insight Matrix:** Displaying comparative consensus ranking using standard validation benchmarks.")
 else:
-    # 🚀 DYNAMIC COMPILATION ENGINE WITH EMOJI STRIPPING SAFETY
+    # 🚀 DYNAMIC COMPILATION ENGINE
     active_dfs = [df for df in [topsis_data, moora_data, vikor_data, fuzzy_data] if df is not None]
     base_df = active_dfs[0]
     
@@ -85,7 +81,7 @@ else:
         dynamic_compiled.append(row)
         
     df_ranks = pd.DataFrame(dynamic_compiled)
-    st.success("⚡ **Live Data Sync:** Successfully normalized all standalone rankings (including Fuzzy TOPSIS Emojis) into pure ordinal values!")
+    st.success("⚡ **Live Data Sync:** Successfully normalized all standalone rankings into pure ordinal values!")
 
 # =========================================================================
 # 2. RENDER THE MATRIX AND CALC BORDA
