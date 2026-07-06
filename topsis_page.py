@@ -132,7 +132,7 @@ st.table(pd.DataFrame(config_data))
 # Step 1: Vector Normalization Denominators
 st.markdown("---")
 st.subheader("Step 2: Vector Normalization Denominators")
-st.markdown(r"Formula Used: $\text{Denominator}_j = \sqrt{\sum_{i=1}^{m} x_{ij}^2}$")
+st.markdown(r"Formula Used: $\text{Denominator}_j = ")
 
 denominators = np.sqrt(np.sum(X**2, axis=0))
 denom_df = pd.DataFrame({
