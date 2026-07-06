@@ -62,29 +62,54 @@ st.markdown("Select whether each criterion should be Maximized (Benefit) or Mini
 
 # Fetch any previously configured dashboard-wide directions if available
 saved_directions = st.session_state.get('saved_directions', {})
-
-criteria_types = {}
-# Creating a dynamic row layout for column configuration inputs
-input_cols = st.columns(len(numeric_cols))
-
-for idx, col in enumerate(numeric_cols):
-    with input_cols[idx]:
-        # Identify default state based on column name or prior state layers
-        if col in saved_directions:
-            default_index = 0 if "max" in str(saved_directions[col]).lower() else 1
+# =========================================================================
+# 🔄 NEW ENHANCED DATA EDITOR GRID LAYOUT (Replaced Code)
+# =========================================================================
+# 1. உங்க ஸ்மார்ட் ரூல்ஸ் (Smart Rules) படி ஆரம்ப டேட்டாபிரேமை உருவாக்குதல்
+direction_rows = []
+for col in numeric_cols:
+    if col in saved_directions:
+        default_val = "Benefit (Maximize)" if "max" in str(saved_directions[col]).lower() else "Cost (Minimize)"
+    else:
+        # Fallback smart automated rule
+        col_lower = col.lower()
+        if "cost" in col_lower or "price" in col_lower or "delivery" in col_lower or "delay" in col_lower:
+            default_val = "Cost (Minimize)"
         else:
-            # Fallback smart automated rule
-            col_lower = col.lower()
-            default_index = 1 if ("cost" in col_lower or "price" in col_lower or "delivery" in col_lower or "delay" in col_lower) else 0
+            default_val = "Benefit (Maximize)"
             
-        user_choice = st.selectbox(
-            f"Direction for '{col}':",
-            options=["Beneficial (Max)", "Non-beneficial (Min)"],
-            index=default_index,
-            key=f"fuzzy_dir_{col}"
+    direction_rows.append({"Criterion Name": col, "Direction": default_val})
+
+df_direction_input = pd.DataFrame(direction_rows)
+
+# 2. இன்டராக்டிவ் டேட்டா எடிட்டர் லேஅவுட் (Clean & Non-breaking Grid)
+edited_direction_df = st.data_editor(
+    df_direction_input,
+    column_config={
+        "Criterion Name": st.column_config.TextColumn("🔬 Criterion Description", disabled=True, width="large"),
+        "Direction": st.column_config.SelectboxColumn(
+            "🎯 Target Optimization",
+            help="Select Benefit to Maximize or Cost to Minimize",
+            options=["Benefit (Maximize)", "Cost (Minimize)"],
+            required=True,
+            width="medium"
         )
-        # Mapping selected choice string back into lowercase 'max' / 'min' for the mathematical backend engine
-        criteria_types[col] = "max" if "max" in user_choice.lower() else "min"
+    },
+    hide_index=True,
+    use_container_width=True,
+    key="fuzzy_topsis_direction_grid"
+)
+
+# 3. யூசர் தேர்ந்தெடுத்த மதிப்புகளை உங்க பழைய கோடிற்கு ஏத்தபடி டிக்ஷ்னரியாக மாற்றுதல்
+criteria_types = {}
+for _, row in edited_direction_df.iterrows():
+    criteria_types[row["Criterion Name"]] = "max" if "Maximize" in row["Direction"] else "min"
+
+# செஷன் ஸ்டேட்டையும் அப்டேட் செய்து கொள்ளலாம்
+st.session_state['saved_directions'] = criteria_types
+# =========================================================================
+
+
 
 st.markdown("---")
 
