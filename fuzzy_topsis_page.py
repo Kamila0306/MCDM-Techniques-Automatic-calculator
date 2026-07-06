@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 
-st.title("📐 Research-Grade Fuzzy TOPSIS Decision Engine")
+st.title(" Fuzzy TOPSIS Decision Engine")
 st.markdown("---")
 
 # =========================================================================
@@ -44,6 +44,15 @@ if saved_weights is not None:
 else:
     for col in numeric_cols:
         weights_dict[col] = 1.0 / len(numeric_cols)
+# --- 📊 NEW EXTRA FEATURE: DATASET PREVIEW ZONE FOR FUZZY TOPSIS ---
+st.markdown("### 📋 Uploaded Evaluation Matrix Preview")
+with st.expander("🔍 Click to view/verify your uploaded Dataset Matrix Values", expanded=False):
+    # அப்லோட் செய்யப்பட்ட டேட்டாவை அப்படியே பிரிவியூ காட்டுகிறோம்
+    preview_df = df_input.copy()
+    preview_df.index = preview_df.index + 1
+    st.dataframe(preview_df, use_container_width=True)
+
+st.markdown("---") # ஒரு சின்ன செப்பரேட்டர் கோடு        
 
 # =========================================================================
 # DYNAMIC USER INTERFACE DIRECTION SELECTION (MAX / MIN CONTROL)
