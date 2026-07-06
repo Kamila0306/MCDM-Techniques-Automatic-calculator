@@ -25,6 +25,17 @@ if len(numeric_cols) == 0:
 
 # --- INITIALIZE RAW DATASET ARRAY FOR MATHEMATICAL COMPUTATION ---
 X = df_input[numeric_cols].values.astype(float)
+# --- 📊 NEW EXTRA FEATURE: DATASET PREVIEW ZONE ---
+st.markdown("### 📋 Uploaded Evaluation Matrix Preview")
+with st.expander("🔍 Click to view/verify your uploaded Dataset Matrix Values", expanded=False):
+    # அப்லோட் செய்யப்பட்ட டேட்டாவை அப்படியே காட்டும் (Index-ஐ 1-லிருந்து மாற்றி)
+    preview_df = df_input.copy()
+    preview_df.index = preview_df.index + 1
+    st.dataframe(preview_df, use_container_width=True)
+
+st.markdown("---") # ஒரு சின்ன செப்பரேட்டர் கோடு
+# --- Existing Step 1 Code Starts Here ---
+st.subheader("⚖️ Step 1: Criteria Weights & Type Configuration")
 
 # 2. Extract AHP Weights directly from Multi-Format Safe Session Storage
 st.subheader("⚖️ Step 1: Criteria Weights & Type Configuration")
