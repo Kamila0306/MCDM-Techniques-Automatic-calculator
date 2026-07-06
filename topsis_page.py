@@ -201,7 +201,7 @@ st.dataframe(df_separation.style.format({
 
 # Step 7: Closeness Coefficient Computation
 st.subheader("Step 8: Closeness Coefficient ($CC_i$) Evaluation")
-
+st.markdown(r"Formula Used: $CC_i = \frac{S_i^-}{S_i^+ + S_i^-}$")
 
 closeness_scores = np.where((s_plus + s_minus) == 0, 0.0, s_minus / (s_plus + s_minus))
 
