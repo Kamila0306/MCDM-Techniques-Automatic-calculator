@@ -11,15 +11,21 @@ st.markdown("---")
 topsis_data = st.session_state.get('topsis_locked_results')
 moora_data = st.session_state.get('moora_locked_results')   
 vikor_data = st.session_state.get('vikor_locked_results')   
-fuzzy_data = st.session_state.get('fuzzy_locked_results')   
+
+# Fuzzy TOPSIS-ன் அனைத்து சாத்தியமான மெமரி கீகளையும் தேடுகிறது
+fuzzy_data = st.session_state.get('fuzzy_locked_results')
+if fuzzy_data is None:
+    fuzzy_data = st.session_state.get('fuzzy_topsis_locked_results')
+if fuzzy_data is None:
+    fuzzy_data = st.session_state.get('df_rankings')
 
 has_active_data = topsis_data is not None or moora_data is not None or vikor_data is not None or fuzzy_data is not None
 
-# 🔥 [PERMANENT FIX] காலம் பெயர்களை துல்லியமாக கண்டறிந்து ரேங்க் எடுக்கும் இறுதி இன்ஜின்
+# 🔥 [THE FINAL BULLETPROOF COMPILING ENGINE]
 def get_clean_rank(df, id_col, sup_id, algo_name):
     df_temp = df.copy()
     
-    # 1. மாற்றுக்களின் ஐடியை (alternative / 16, 15...) கண்டறிதல்
+    # alternative காலம் பெயரைக் கண்டறிதல்
     current_id_col = None
     if id_col in df_temp.columns:
         current_id_col = id_col
@@ -30,38 +36,52 @@ def get_clean_rank(df, id_col, sup_id, algo_name):
     df_temp[current_id_col] = df_temp[current_id_col].astype(str).str.strip()
     target_id_str = str(sup_id).strip()
     
-    # சப்ளையர் ரோ-வை மட்டும் தனியாக எடுக்கிறது
-    sub_df = df_temp[df_temp[current_id_col] == target_id_str]
-    if sub_df.empty:
-        return 1
+    # 🎯 VIKOR, TOPSIS, MOORA, FUZZY-ன் ஸ்கோர் காலம்களைத் துல்லியமாகப் பிரித்தல்
+    score_col = None
+    columns_lower = [c.lower() for c in df_temp.columns]
+    
+    if algo_name.lower() == 'vikor':
+        # VIKOR பக்கத்தில் இருக்கும் 'Q' அல்லது 'q_' காலம்களை மட்டும் குறிவைக்கிறது
+        vikor_matches = [c for c in df_temp.columns if c.lower() == 'q' or 'q_' in c.lower() or 'v_' in c.lower()]
+        if vikor_matches:
+            score_col = vikor_matches[0]
+    elif algo_name.lower() == 'fuzzy':
+        fuzzy_matches = [c for c in df_temp.columns if 'cc' in c.lower() or 'performance' in c.lower()]
+        if fuzzy_matches:
+            score_col = fuzzy_matches[0]
+            
+    # ஒருவேளை மேலே மேட்ச் ஆகவில்லை எனில் பொதுவான ஸ்கோர் காலம்களைத் தேடுகிறது
+    if not score_col:
+        for c in df_temp.columns:
+            if c != current_id_col and any(w in c.lower() for w in ['score', 'value', 'performance', 'cc', 'q', 'v']):
+                score_col = c
+                break
+
+    # ஸ்கோர் காலம் கிடைத்துவிட்டால், அதை வச்சு பிரெஷ்ஷா ரேங்க் போடுகிறது
+    if score_col:
+        df_temp[score_col] = pd.to_numeric(df_temp[score_col], errors='coerce').fillna(0)
         
-    # 2. 'Rank Position' அல்லது 'rank' என்று தொடங்கும் அசல் ரேங்க் காலம்களை தேடுகிறது
+        # ⚠️ VIKOR-க்கு மட்டும் குறைந்த ஸ格ார் தான் பெஸ்ட் (Ascending=True), மற்றவற்றுக்கு அதிக ஸ்கோர் பெஸ்ட் (Ascending=False)
+        is_ascending = True if algo_name.lower() == 'vikor' or score_col.lower() == 'q' else False
+        df_temp['Calculated_Rank'] = df_temp[score_col].rank(ascending=is_ascending, method='min')
+        
+        sub_df = df_temp[df_temp[current_id_col] == target_id_str]
+        if not sub_df.empty:
+            return int(sub_df['Calculated_Rank'].values[0])
+            
+    # மாற்று வழி: டேபிளில் நேரடியாக இருக்கும் ரேங்க் காலமில் இருந்து எடுப்பது
     rank_cols = [c for c in df_temp.columns if 'rank' in c.lower() or 'position' in c.lower()]
     if rank_cols:
-        val = str(sub_df[rank_cols[0]].values[0])
-        digits = ''.join([char for char in val if char.isdigit()])
-        if digits:
-            return int(digits)
-            
-    # 3. ஒருவேளை மேலேயும் சிக்கல் இருந்தால் 'CC Performance Score' போன்ற ஸ்கோரை வைத்து கணக்கிடுகிறது
-    score_cols = [c for c in df_temp.columns if any(w in c.lower() for w in ['score', 'value', 'performance', 'assessment', 'cc ', 'q_', 'v_'])]
-    if score_cols:
-        target_col = score_cols[0]
-        is_ascending = True if 'vikor' in algo_name.lower() or 'q_' in target_col.lower() else False
-        
-        df_temp[target_col] = pd.to_numeric(df_temp[target_col], errors='coerce').fillna(0)
-        df_temp['Calculated_Rank'] = df_temp[target_col].rank(ascending=is_ascending, method='min')
-        
-        # ரீ-ரேங்க் செய்து சரியாக திருப்பித் தருகிறது
-        if not is_ascending:
-            df_temp['Calculated_Rank'] = df_temp[target_col].rank(ascending=False, method='min')
-            
-        return int(df_temp.loc[df_temp[current_id_col] == target_id_str, 'Calculated_Rank'].values[0])
-        
+        sub_df = df_temp[df_temp[current_id_col] == target_id_str]
+        if not sub_df.empty:
+            val = str(sub_df[rank_cols[0]].values[0])
+            digits = ''.join([char for char in val if char.isdigit()])
+            if digits:
+                return int(digits)
+                
     return 1
 
 if not has_active_data:
-    # 🔄 AUTOMATIC FALLBACK INJECTION (சாண்ட்பாக்ஸ் பேக்அப்)
     data_matrix = {
         "alternative": ["Alpha", "Beta", "Gamma", "Delta", "Omega"],
         "TOPSIS": [5, 4, 3, 2, 1],
@@ -73,18 +93,22 @@ if not has_active_data:
     id_col = "alternative"
     st.info("💡 **Insight Matrix:** Displaying comparative consensus ranking using standard validation benchmarks.")
 else:
-    # 🚀 DYNAMIC COMPILATION ENGINE
     active_dfs = [df for df in [topsis_data, moora_data, vikor_data, fuzzy_data] if df is not None]
     base_df = active_dfs[0]
     
     id_col = 'alternative' if 'alternative' in base_df.columns else base_df.columns[0]
-    all_suppliers = base_df[id_col].tolist()
+    
+    all_suppliers = []
+    for df in active_dfs:
+        c_col = id_col if id_col in df.columns else df.columns[0]
+        all_suppliers.extend(df[c_col].astype(str).str.strip().tolist())
+    all_suppliers = sorted(list(set(all_suppliers)), key=lambda x: float(x) if x.replace('.','',1).isdigit() else x)
 
     dynamic_compiled = []
     for sup in all_suppliers:
-        row = {id_col: sup}
+        display_sup = int(float(sup)) if sup.replace('.','',1).isdigit() and float(sup).is_integer() else sup
+        row = {id_col: display_sup}
         
-        # உங்களோட 4 அல்காரிதம்களையும் துல்லியமாக மேப் செய்கிறோம்
         row['TOPSIS'] = get_clean_rank(topsis_data, id_col, sup, 'topsis') if topsis_data is not None else 1
         row['MOORA'] = get_clean_rank(moora_data, id_col, sup, 'moora') if moora_data is not None else 1
         row['VIKOR'] = get_clean_rank(vikor_data, id_col, sup, 'vikor') if vikor_data is not None else 1
