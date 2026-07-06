@@ -15,39 +15,45 @@ fuzzy_data = st.session_state.get('fuzzy_locked_results')
 
 has_active_data = topsis_data is not None or moora_data is not None or vikor_data is not None or fuzzy_data is not None
 
-# ஹெல்பர் ஃபங்க்ஷன்: டேபிளில் ரேங்க் காலம் இருந்தால் எடுக்கும், இல்லையென்றால் ஸ்கோரை வச்சு புது ரேங்க் போடும்!
+# 🔥 [SUPER FIX] எமோஜி மற்றும் டெக்ஸ்ட் கலந்திருந்தாலும் அசல் ரேங்க் நம்பரை மட்டும் பிரித்தெடுக்கும் இன்ஜின்
 def get_clean_rank(df, id_col, sup_id, algo_name):
     sub_df = df[df[id_col] == sup_id]
     if sub_df.empty:
         return 1
     
-    # 1. முதலாவதாக 'rank' வார்த்தை உள்ள காலமைத் தேடுகிறது
-    rank_cols = [c for c in df.columns if 'rank' in c.lower()]
+    # 1. 'rank' வார்த்தை உள்ள காலம்களைத் தேடுகிறது (e.g., 'Rank Position')
+    rank_cols = [c for c in df.columns if 'rank' in c.lower() or 'position' in c.lower()]
     if rank_cols:
-        val = sub_df[rank_cols[0]].values[0]
-        # வேல்யூ முழு எண்ணாக (Rank 1, 2, 3) இருந்தால் அப்படியே ரிட்டர்ன் செய்யும்
-        if float(val).is_integer() and val > 0 and val <= len(df):
-            return int(val)
+        val = str(sub_df[rank_cols[0]].values[0])
+        # 🥇 1, 🥈 2 போன்ற எமோஜிகளில் இருந்து வெறும் எண்களை மட்டும் தனியாகப் பிரிக்கிறது
+        digits = ''.join([char for char in val if char.isdigit()])
+        if digits:
+            return int(digits)
             
-    # 2. [மேஜிக் ஃபிக்ஸ்] ரேங்க் காலம் இல்லை அல்லது தவறாக இருந்தால், ஸ்கோர் காலம்களை வச்சு இங்கேயே ரேங்க் போடுகிறது!
-    # 'score' அல்லது 'value' அல்லது 'q_' போன்ற வார்த்தை உள்ள காலம்களைத் தேடுகிறது
-    score_cols = [c for c in df.columns if any(w in c.lower() for w in ['score', 'value', 'assessment', 'q_', 'v_', 'p_']) or c not in [id_col]]
-    
+    # 2. ஒருவேளை ரேங்க் காலம் ஸ்ட்ரிங்காகவோ அல்லது ஸ்கோராகவோ இருந்தால், இங்கேயே புது ரேங்க் போடுகிறது!
+    score_cols = [c for c in df.columns if any(w in c.lower() for w in ['score', 'value', 'performance', 'assessment', 'q_', 'v_']) or c not in [id_col]]
     if score_cols:
         target_col = score_cols[0]
-        # VIKOR-ல் மட்டும் குறைந்த ஸ்கோர் தான் பெஸ்ட் (Ascending), மத்தவற்றுக்கு அதிக ஸ格ர் பெஸ்ட் (Descending)
+        # VIKOR-க்கு மட்டும் Ascending, மத்த எல்லாத்துக்கும் Descending ரேங்க்
         ascending_order = True if 'vikor' in algo_name.lower() or 'q_' in target_col.lower() else False
         
-        # தற்காலிகமாக ரேங்க் போட்டு சப்ளையரின் ரேங்கை எடுக்கிறது
+        # ஸ்ட்ரிங் டேட்டாக்களை நம்பராக மாற்றுகிறது
         temp_df = df[[id_col, target_col]].copy()
-        temp_df['Calculated_Rank'] = temp_df[target_col].rank(ascending=ascending_order, method='min')
+        temp_df[target_col] = pd.to_numeric(temp_df[target_col], errors='coerce').fillna(0)
         
+        temp_df['Calculated_Rank'] = temp_df[target_col].rank(ascending=ascending_order, method='min', ascending_order=not ascending_order)
+        # மெத்தட் சரிசெய்தல்
+        if ascending_order:
+            temp_df['Calculated_Rank'] = temp_df[target_col].rank(ascending=True, method='min')
+        else:
+            temp_df['Calculated_Rank'] = temp_df[target_col].rank(ascending=False, method='min')
+            
         return int(temp_df.loc[temp_df[id_col] == sup_id, 'Calculated_Rank'].values[0])
         
     return 1
 
 if not has_active_data:
-    # 🔄 AUTOMATIC FALLBACK INJECTION (சாண்ட்பாக்ஸ்)
+    # 🔄 AUTOMATIC FALLBACK INJECTION (சாண்ட்பாக்ஸ் பேக்அப்)
     data_matrix = {
         "Supplier": ["Alpha", "Beta", "Gamma", "Delta", "Omega"],
         "TOPSIS": [5, 4, 3, 2, 1],
@@ -59,7 +65,7 @@ if not has_active_data:
     id_col = "Supplier"
     st.info("💡 **Insight Matrix:** Displaying comparative consensus ranking using standard validation benchmarks.")
 else:
-    # 🚀 DYNAMIC COMPILATION ENGINE WITH AUTO-RANK REPAIR
+    # 🚀 DYNAMIC COMPILATION ENGINE WITH EMOJI STRIPPING SAFETY
     active_dfs = [df for df in [topsis_data, moora_data, vikor_data, fuzzy_data] if df is not None]
     base_df = active_dfs[0]
     
@@ -70,19 +76,16 @@ else:
     for sup in all_suppliers:
         row = {id_col: sup}
         
-        # TOPSIS
+        # Each Algorithm Mapping via Safe Clean Rank Engine
         row['TOPSIS'] = get_clean_rank(topsis_data, id_col, sup, 'topsis') if topsis_data is not None else 1
-        # MOORA
         row['MOORA'] = get_clean_rank(moora_data, id_col, sup, 'moora') if moora_data is not None else 1
-        # VIKOR
         row['VIKOR'] = get_clean_rank(vikor_data, id_col, sup, 'vikor') if vikor_data is not None else 1
-        # Fuzzy TOPSIS
         row['Fuzzy TOPSIS'] = get_clean_rank(fuzzy_data, id_col, sup, 'fuzzy') if fuzzy_data is not None else 1
             
         dynamic_compiled.append(row)
         
     df_ranks = pd.DataFrame(dynamic_compiled)
-    st.success("⚡ **Live Data Sync:** Successfully dynamic-sorted and normalized raw scores into ordinal rankings!")
+    st.success("⚡ **Live Data Sync:** Successfully normalized all standalone rankings (including Fuzzy TOPSIS Emojis) into pure ordinal values!")
 
 # =========================================================================
 # 2. RENDER THE MATRIX AND CALC BORDA
@@ -91,7 +94,6 @@ if df_ranks is not None:
     st.subheader("📋 Consolidated Individual MCDM Rank Matrix")
     st.markdown("This matrix summarizes the standalone ordinal rankings generated by each decision algorithm:")
     
-    # 🛡️ ரேங்க்குகள் முழு எண்களாக (Integers) மாறுவதை உறுதி செய்கிறோம்
     technique_cols = [c for c in df_ranks.columns if c != id_col]
     for col in technique_cols:
         df_ranks[col] = df_ranks[col].astype(int)
@@ -103,7 +105,6 @@ if df_ranks is not None:
     st.subheader("🏅 Consensus Optimization: Borda Count Method")
     
     df_borda_points = df_ranks.copy()
-    
     for col in technique_cols:
         df_borda_points[col] = num_alternatives + 1 - df_ranks[col]
         
