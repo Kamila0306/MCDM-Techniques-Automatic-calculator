@@ -318,10 +318,9 @@ df_rankings.index = df_rankings.index + 1
 df_rankings.index.name = "Rank Position"
 
 df_rankings_disp = df_rankings.reset_index()
-
+df_rankings_disp["Rank Position"] = df_rankings_disp["Rank Position"].apply(lambda r: f" 1" if r==1 else (f" 2" if r==2 else (f" 3" if r==3 else str(r))))
 df_rankings_disp = df_rankings_disp.set_index("Rank Position")
 df_rankings_disp["CC Performance Score"] = df_rankings_disp["CC"].map(lambda x: f"{x:.4f}")
-df_rankings_disp["Rank Position"] = df_rankings_disp["Rank Position"].apply(lambda r: f" 1" if r==1 else (f" 2" if r==2 else (f" 3" if r==3 else str(r))))
 df_rankings_disp = df_rankings_disp.drop(columns=["CC"])
 
 st.dataframe(df_rankings_disp, use_container_width=True)
