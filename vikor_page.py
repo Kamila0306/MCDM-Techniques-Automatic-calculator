@@ -200,9 +200,9 @@ df_final_vikor.index.name = "Rank"
 
 # Assign aesthetic medals to top items
 def assign_medals(rank):
-    if rank == 1: return "🥇 1"
-    elif rank == 2: return "🥈 2"
-    elif rank == 3: return "🥉 3"
+    if rank == 1: return " 1"
+    elif rank == 2: return " 2"
+    elif rank == 3: return " 3"
     return str(rank)
 
 df_final_vikor_disp = df_final_vikor.reset_index()
