@@ -330,20 +330,19 @@ st.success(f"🎉 **Mathematical System Verdict:** Optimal choice profile candid
 st.markdown("---")
 
 # =========================================================================
-# 🔒 SYSTEM DATA MEMORY STATE ENGINE LOCKING MECHANISM (UPDATED)
+# 🔒 SYSTEM DATA MEMORY STATE ENGINE LOCKING MECHANISM
 # =========================================================================
 st.subheader("💾 Lock Operational Decision State Models")
 
 if st.button("🔒 Execute Permanent Cache State Lock", type="primary"):
-    # 🌟 [CRITICAL FIX] ஓவர்ஆல் பேஜுக்குப் புரியுற மாதிரி காலம் பெயர்களை மாற்றி, இன்டெக்ஸை ரீசெட் செய்கிறோம்
-    df_for_consensus = df_rankings.copy().reset_index()
-    df_for_consensus.rename(columns={'CC': 'CC Performance Score'}, inplace=True)
+    # 🌟 [உண்மையான பிக்ஸ்] ஓவர்ஆல் பேஜுக்குப் புரியும் படி இன்டெக்ஸை காலம் ஆக மாற்றி, சரியான பெயர்களை வைக்கிறோம்
+    df_for_overall = df_rankings.reset_index().copy()
+    df_for_overall.rename(columns={'CC': 'CC Performance Score'}, inplace=True)
     
-    # 🌟 [KEY NAME FIX] ஓவர்ஆல் பேஜ் தேடும் அதே 'fuzzy_locked_results' பெயரிலேயே சேமிக்கிறோம்!
-    st.session_state['fuzzy_locked_results'] = df_for_consensus
+    # 🌟 [மிரட்டலான பிக்ஸ்] ஓவர்ஆல் பேஜ் தேடும் இரண்டு சாத்தியமான கீகளிலும் (Keys) டேட்டாவை லாக் செய்கிறோம்!
+    st.session_state['fuzzy_locked_results'] = df_for_overall
+    st.session_state['fuzzy_topsis_locked_results'] = df_for_overall
     
-    # உங்களது பழைய பேக்கப் கீகளும் அப்படியே இருக்கட்டும்:
-    st.session_state['fuzzy_topsis_locked_results'] = df_rankings.copy()
     st.session_state['fuzzy_topsis_winner'] = fuzzy_winner
     st.session_state['selected_fuzzy_method'] = approach_mode
     st.success("💾 Mathematical pipeline matrix structures safely synchronized into system data cache modules.")
