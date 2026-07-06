@@ -46,6 +46,15 @@ else:
     st.warning("⚠️ **AHP Weights Profile Not Found.** Utilizing calculated equal fallback allocations.")
     for col in numeric_cols:
         weights_dict[col] = 1.0 / len(numeric_cols)
+st.markdown("### 📋 Uploaded Evaluation Matrix Preview")
+with st.expander("🔍 Click to view/verify your uploaded Dataset Matrix Values", expanded=False):
+    # செஷன் ஸ்டேட்ல இருந்து வர்ற df_input-ஐ அப்படியே பிரிவியூ காட்டுகிறோம்
+    preview_df = df_input.copy()
+    preview_df.index = preview_df.index + 1
+    st.dataframe(preview_df, use_container_width=True)
+
+st.markdown("---") 
+        
 
 # Display Active Configured Variables Table & DYNAMIC DIRECTION SETUP
 st.markdown("### 📊 Active Analysis Matrix Setup & Direction Configuration")
