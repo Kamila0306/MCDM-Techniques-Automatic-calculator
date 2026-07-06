@@ -330,11 +330,19 @@ st.success(f"🎉 **Mathematical System Verdict:** Optimal choice profile candid
 st.markdown("---")
 
 # =========================================================================
-# 🔒 SYSTEM DATA MEMORY STATE ENGINE LOCKING MECHANISM
+# 🔒 SYSTEM DATA MEMORY STATE ENGINE LOCKING MECHANISM (UPDATED)
 # =========================================================================
 st.subheader("💾 Lock Operational Decision State Models")
 
 if st.button("🔒 Execute Permanent Cache State Lock", type="primary"):
+    # 🌟 [CRITICAL FIX] ஓவர்ஆல் பேஜுக்குப் புரியுற மாதிரி காலம் பெயர்களை மாற்றி, இன்டெக்ஸை ரீசெட் செய்கிறோம்
+    df_for_consensus = df_rankings.copy().reset_index()
+    df_for_consensus.rename(columns={'CC': 'CC Performance Score'}, inplace=True)
+    
+    # 🌟 [KEY NAME FIX] ஓவர்ஆல் பேஜ் தேடும் அதே 'fuzzy_locked_results' பெயரிலேயே சேமிக்கிறோம்!
+    st.session_state['fuzzy_locked_results'] = df_for_consensus
+    
+    # உங்களது பழைய பேக்கப் கீகளும் அப்படியே இருக்கட்டும்:
     st.session_state['fuzzy_topsis_locked_results'] = df_rankings.copy()
     st.session_state['fuzzy_topsis_winner'] = fuzzy_winner
     st.session_state['selected_fuzzy_method'] = approach_mode
