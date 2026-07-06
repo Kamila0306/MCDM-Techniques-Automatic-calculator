@@ -125,10 +125,42 @@ if df_ranks is not None:
     from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable  # type: ignore
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle  # type: ignore
     from reportlab.lib import colors  # type: ignore
+    from reportlab.pdfgen import canvas  # type: ignore
+
+    # 📄 [NEW ADDITION] Numbered Canvas Class for Professional Footer (Page X of Y)
+    class NumberedCanvas(canvas.Canvas):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self._saved_page_states = []
+
+        def showPage(self):
+            self._saved_page_states.append(dict(self.__dict__))
+            self._startPage()
+
+        def save(self):
+            num_pages = len(self._saved_page_states)
+            for state in self._saved_page_states:
+                self.__dict__.update(state)
+                self.draw_page_decorations(num_pages)
+                super().showPage()
+            super().save()
+
+        def draw_page_decorations(self, page_count):
+            self.saveState()
+            self.setFont("Helvetica", 8)
+            self.setFillColor(colors.HexColor('#475569')) # Slate Grey
+            
+            # Left Footer: Project Name
+            self.drawString(40, 25, "MCDM Decision Optimization System — Consensus Report")
+            
+            # Right Footer: Dynamic Page Numbering (Page X of Y)
+            page_text = f"Page {self._pageNumber} of {page_count}"
+            self.drawRightString(self._pagesize[0] - 40, 25, page_text)
+            self.restoreState()
 
     # Create an in-memory buffer for the PDF
     pdf_buffer = io.BytesIO()
-    doc = SimpleDocTemplate(pdf_buffer, pagesize=letter, rightMargin=40, leftMargin=40, topMargin=40, bottomMargin=40)
+    doc = SimpleDocTemplate(pdf_buffer, pagesize=letter, rightMargin=40, leftMargin=40, topMargin=40, bottomMargin=50)
     story = []
 
     # Styles Setup
@@ -176,6 +208,16 @@ if df_ranks is not None:
         leading=12,
         alignment=1 # Center Alignment
     )
+    
+    # [NEW STYLE] Header Text Style to ensure contrast on Dark Blue background
+    table_header_style = ParagraphStyle(
+        'PDFTableHeader',
+        parent=styles['Normal'],
+        fontSize=10,
+        leading=12,
+        textColor=colors.whitesmoke,
+        alignment=1 # Center Alignment
+    )
 
     # 1. Title and Metadata
     story.append(Paragraph("🏆 Multi-Criteria Rank Aggregation & Consensus Report", title_style))
@@ -195,11 +237,11 @@ if df_ranks is not None:
     # 3. Compiled Consensus Table Matrix Section
     story.append(Paragraph(f"📊 Compiled Consensus Evaluation Matrix (Top {top_k} Filtered Models)", section_style))
     
-    # Table Data Construction
+    # Table Data Construction with new table_header_style
     table_data = [[
-        Paragraph("<b>Consensus Rank</b>", table_text_style), 
-        Paragraph(f"<b>{id_col}</b>", table_text_style), 
-        Paragraph("<b>Final Borda score Result</b>", table_text_style)
+        Paragraph("<b>Consensus Rank</b>", table_header_style), 
+        Paragraph(f"<b>{id_col}</b>", table_header_style), 
+        Paragraph("<b>Final Borda score Result</b>", table_header_style)
     ]]
     
     for idx, row in df_report_data.iterrows():
@@ -209,16 +251,15 @@ if df_ranks is not None:
             Paragraph(str(row['Total Borda Score']), table_text_style)
         ])
     
-    # Creating and Styling the Table matching clean system UI
+    # Creating and Styling the Table with Dark Corporate Blue Theme
     ranking_table = Table(table_data, colWidths=[120, 260, 150])
     ranking_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#F2F2F2')),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.HexColor('#000000')),
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1E3A8A')), # 🎨 [CHANGED] Premium Dark Corporate Blue
         ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
         ('BOTTOMPADDING', (0, 0), (-1, 0), 10),
         ('TOPPADDING', (0, 0), (-1, 0), 10),
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#DDDDDD')),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#CBD5E1')),
         ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white]),
         ('TOPPADDING', (0, 1), (-1, -1), 8),
         ('BOTTOMPADDING', (0, 1), (-1, -1), 8),
@@ -228,8 +269,8 @@ if df_ranks is not None:
     story.append(Spacer(1, 20))
     story.append(Paragraph("<i>Report automatically compiled via MCDM Decision Optimization Engine.</i>", meta_style))
 
-    # Build PDF Document
-    doc.build(story)
+    # Build PDF Document linking the new NumberedCanvas footer engine
+    doc.build(story, canvasmaker=NumberedCanvas) # 📄 [CHANGED] Added canvasmaker
     pdf_data = pdf_buffer.getvalue()
     pdf_buffer.close()
 
