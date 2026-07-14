@@ -83,20 +83,20 @@ def get_clean_rank(df, id_col, sup_id, algo_name):
 
 if not has_active_data:
     data_matrix = {
-        "alternative": ["Alpha", "Beta", "Gamma", "Delta", "Omega"],
+        "Alternative": ["Alpha", "Beta", "Gamma", "Delta", "Omega"],
         "TOPSIS": [5, 4, 3, 2, 1],
         "MOORA": [5, 2, 4, 3, 1],
         "VIKOR": [4, 5, 3, 1, 2],
         "Fuzzy TOPSIS": [5, 3, 4, 2, 1]
     }
     df_ranks = pd.DataFrame(data_matrix)
-    id_col = "alternative"
+    id_col = "Alternative"
     st.info("💡 **Insight Matrix:** Displaying comparative consensus ranking using standard validation benchmarks.")
 else:
     active_dfs = [df for df in [topsis_data, moora_data, vikor_data, fuzzy_data] if df is not None]
     base_df = active_dfs[0]
     
-    id_col = 'alternative' if 'alternative' in base_df.columns else base_df.columns[0]
+    id_col = 'Alternative' if 'Alternative' in base_df.columns else base_df.columns[0]
     
     all_suppliers = []
     for df in active_dfs:
@@ -193,6 +193,9 @@ if df_ranks is not None:
     # =========================================================================
     # 4. REPORTLAB PDF EXPORT SYSTEM
     # =========================================================================
+    # =========================================================================
+    # 4. REPORTLAB PDF EXPORT SYSTEM (INTELLIGENT CRITERIA-BASED JUSTIFICATION)
+    # =========================================================================
     st.markdown("---")
     st.subheader("📥 2. Academic Synthesis Report Generator")
     
@@ -202,7 +205,43 @@ if df_ranks is not None:
         min_value=1, max_value=max_available, value=min(10, max_available), step=1, key="consensus_top_k_slider"
     )
 
+    # 1. தரவை ஃபில்டர் செய்தல்
     df_report_data = df_ui_table.head(top_k).copy()
+    
+    filtered_best_candidate = df_report_data.iloc[0][id_col]
+    filtered_best_score = int(df_final_sorted.iloc[0]['Total Borda Score'])
+    filtered_second_candidate = df_report_data.iloc[1][id_col] if len(df_report_data) > 1 else "N/A"
+
+    # 2. 🧠 INTELLIGENT CRITERIA-BASED JUSTIFICATION ENGINE
+    # முதலிடம் பிடித்த ஆல்டர்நேட்டிவ் எந்தெந்த அல்காரிதமில் 1 அல்லது 2 வது ரேங்க் வாங்கியுள்ளது எனப் பார்க்கிறது
+    best_row = df_report_data.iloc[0]
+    
+    # அல்காரிதம் சார்ந்த பலங்களை (Strengths) கண்டறிதல்
+    strengths = []
+    if 'TOPSIS' in best_row and int(best_row['TOPSIS']) <= 2:
+        strengths.append("<b>Geometric Optimization (TOPSIS)</b>: Ideal balance of maximizing benefits while strictly controlling cost vectors.")
+    if 'MOORA' in best_row and int(best_row['MOORA']) <= 2:
+        strengths.append("<b>Pure Cost-Benefit Efficiency (MOORA)</b>: High volume operational dominance, yielding the highest return over cost expenditure.")
+    if 'VIKOR' in best_row and int(best_row['VIKOR']) <= 2:
+        strengths.append("<b>Risk & Bottleneck Mitigation (VIKOR)</b>: Elite stability with minimum individual regret, ensuring no critical attribute fails safety margins.")
+    if 'Fuzzy TOPSIS' in best_row and int(best_row['Fuzzy TOPSIS']) <= 2:
+        strengths.append("<b>Qualitative Human Consensus (Fuzzy TOPSIS)</b>: Strongest alignment with expert opinions and subjective parameters like reputation and quality.")
+
+    # ஒருவேளை எந்த அல்காரிதமிலும் டாப் 2 இல்லை என்றால் பொதுவான லாஜிக்
+    if not strengths:
+        strengths.append("<b>Balanced Consensus</b>: Stable performance across all conflicting operational constraints without extreme individual failure.")
+
+    # பிடிஎஃப்-ல் காட்டுவதற்கான டெக்ஸ்ட் வடிவமைப்பு
+    justification_title = f"Multi-Dimensional Strength Profile for Alternative {filtered_best_candidate}"
+    strengths_html = "<br/><br/>".join([f"• {s}" for s in strengths])
+    
+    justification_desc = f"""
+    The mathematical aggregation engine has selected <b>Alternative {filtered_best_candidate}</b> as the Rank 1 optimal solution. A deep architectural audit of the underlying MCDM models confirms that this choice is justified by the following core performance strengths:
+    <br/><br/>
+    {strengths_html}
+    <br/><br/>
+    <b>Conclusion for Trust-Driven Selection:</b> Unlike single-track models, this selection guarantees that <b>Alternative {filtered_best_candidate}</b> prioritizes critical quality parameters over non-beneficial cost overruns, providing a robust, risk-mitigated decision for executive deployment.
+    """
 
     import io
     from datetime import datetime
@@ -239,25 +278,31 @@ if df_ranks is not None:
     story = []
     styles = getSampleStyleSheet()
     
-    title_style = ParagraphStyle('PDFTitle', parent=styles['Heading1'], fontSize=18, leading=22, textColor=colors.HexColor('#1E293B'))
+    title_style = ParagraphStyle('PDFTitle', parent=styles['Heading1'], fontSize=16, leading=20, textColor=colors.HexColor('#1E293B'))
     meta_style = ParagraphStyle('PDFMeta', parent=styles['Normal'], fontSize=9, leading=13, textColor=colors.HexColor('#475569'))
-    section_style = ParagraphStyle('PDFSection', parent=styles['Heading3'], fontSize=12, leading=16, textColor=colors.HexColor('#0F172A'), spaceBefore=15, spaceAfter=8)
-    body_style = ParagraphStyle('PDFBody', parent=styles['Normal'], fontSize=10, leading=14, textColor=colors.HexColor('#334155'))
+    section_style = ParagraphStyle('PDFSection', parent=styles['Heading3'], fontSize=11, leading=15, textColor=colors.HexColor('#0F172A'), spaceBefore=12, spaceAfter=6)
+    body_style = ParagraphStyle('PDFBody', parent=styles['Normal'], fontSize=9, leading=13, textColor=colors.HexColor('#334155'))
+    thesis_style = ParagraphStyle('PDFThesis', parent=styles['Normal'], fontSize=8.5, leading=12.5, textColor=colors.HexColor('#475569'), leftIndent=15, firstLineIndent=-10)
     table_text_style = ParagraphStyle('PDFTableText', parent=styles['Normal'], fontSize=9, leading=11, alignment=1)
     table_header_style = ParagraphStyle('PDFTableHeader', parent=styles['Normal'], fontSize=9, leading=11, textColor=colors.whitesmoke, alignment=1)
 
+    # Header Section
     story.append(Paragraph("🏆 Multi-Criteria Rank Aggregation & Consensus Report", title_style))
     story.append(Paragraph(f"<b>Analysis Date:</b> {datetime.now().strftime('%d %B %Y')}", meta_style))
     story.append(Paragraph(f"<b>Evaluation Scope:</b> Integrated Framework ({', '.join(technique_cols)})", meta_style))
+    story.append(Paragraph(f"<b>Filtered Output Constraint:</b> Top {top_k} Alternatives Selected by User", meta_style))
     story.append(Spacer(1, 10))
     story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor('#CBD5E1'), spaceBefore=5, spaceAfter=15))
 
-    story.append(Paragraph("🎯 Summary Conclusion:", section_style))
-    conclusion_text = f"Based on the cross-evaluation of the loaded multi-dimensional parameters, Alternative <b>{best_candidate_borda}</b> has successfully secured the Rank 1 position with an absolute consolidated Borda score of <b>{score_borda} points</b>."
+    # Summary Conclusion
+    story.append(Paragraph("■ Summary Conclusion:", section_style))
+    conclusion_text = f"Based on the cross-evaluation of the loaded multi-dimensional parameters restricted to the user-specified filter, Alternative <b>{filtered_best_candidate}</b> has successfully secured the Rank 1 position within this bounded set, achieving an absolute consolidated Borda score of <b>{filtered_best_score} points</b>."
     story.append(Paragraph(conclusion_text, body_style))
     
-    story.append(Spacer(1, 15))
-    story.append(Paragraph(f"📊 Compiled Consensus Evaluation Matrix (Top {top_k} Filtered Models)", section_style))
+    story.append(Spacer(1, 10))
+    
+    # Table Layout
+    story.append(Paragraph(f"■ Compiled Consensus Evaluation Matrix (Top {top_k} Filtered Models)", section_style))
     
     header_row = [Paragraph("<b>Consensus Rank</b>", table_header_style), Paragraph(f"<b>{id_col}</b>", table_header_style)]
     for tech in technique_cols:
@@ -273,7 +318,7 @@ if df_ranks is not None:
         table_data.append(row_content)
     
     num_cols_total = len(header_row)
-    col_widths = [70, 110] + [350 // (num_cols_total - 2)] * (num_cols_total - 2)
+    col_widths = [75, 105] + [350 // (num_cols_total - 2)] * (num_cols_total - 2)
     
     ranking_table = Table(table_data, colWidths=col_widths)
     ranking_table.setStyle(TableStyle([
@@ -287,13 +332,46 @@ if df_ranks is not None:
     ]))
     story.append(ranking_table)
     
+    # -------------------------------------------------------------------------
+    ## -------------------------------------------------------------------------
+    # 🎯 புதிய அம்சம்: துல்லியமான வணிகக் காரணப் பெட்டி (Fixed Spacing Version)
+    # -------------------------------------------------------------------------
+    story.append(Spacer(1, 15))  # தலைப்புக்கு மேலே நல்ல கேப்
+    story.append(Paragraph(f"<b>■ Strategic Selection Justification ({justification_title}):</b>", section_style))
+    
+    story.append(Spacer(1, 8))   # தலைப்புக்கும் பாக்ஸுக்கும் நடுவில் கேப்
+    
+    justification_box_style = ParagraphStyle(
+        'PDFJustBox', parent=styles['Normal'], fontSize=9, leading=14, 
+        textColor=colors.HexColor('#1E293B'), backColor=colors.HexColor('#F8FAFC'), 
+        borderColor=colors.HexColor('#E2E8F0'), borderWidth=0.75, 
+        borderPadding=12,
+        spaceBefore=0, spaceAfter=0  # குழப்பம் விளைவிக்கும் இன்-பில்ட் ஸ்பேஸை பூஜ்ஜியமாக்குகிறோம்
+    )
+    story.append(Paragraph(justification_desc, justification_box_style))
+    
+    story.append(Spacer(1, 15))  # பாக்ஸுக்கும் கீழே வரும் தியசிஸ் டெக்ஸ்டுக்கும் நடுவில் நல்ல கேப்
+    # -------------------------------------------------------------------------
+    
+    story.append(Spacer(1, 10))
+    
+    # Thesis Text
+    story.append(Paragraph("■ Academic Thesis Conclusion Text Generator:", section_style))
+    tech_names_str = ", ".join(technique_cols)
+    thesis_text = f"""
+    <i>"By deploying an Integrated Analytical Hierarchy Process (AHP) framework to distribute standard criteria weights, the alternative candidate profiles were thoroughly cross-evaluated using distinct Multi-Criteria Decision Making tracks, namely <b>{tech_names_str}</b>. To reconcile minor divergence layers across standalone models and deliver a non-conflicting solid consensus decision matrix, individual system rankings were compiled using the rigorous mathematical <b>Borda Count Rank Aggregation Protocol</b>. 
+    <br/><br/>
+    Empirical computation results restricted to the top {top_k} evaluated subset confirm that Alternative <b>{filtered_best_candidate}</b> consistently outperforms competing models across distinct vector constraints, securing the unambiguous <b>Rank 1 position</b> with an absolute Borda total score of <b>{filtered_best_score} points</b>. The candidate profile <b>{filtered_second_candidate}</b> firmly secures the second position, establishing a structured risk-mitigated preference chain for real-world project deployment execution targets."</i>
+    """
+    story.append(Paragraph(thesis_text, thesis_style))
+    
     doc.build(story, canvasmaker=NumberedCanvas)
     pdf_data = pdf_buffer.getvalue()
     pdf_buffer.close()
 
     st.markdown("---")
     st.download_button(
-        label="📥 Download Analytical Report (PDF)",
+        label=f"📥 Download Strategic Analytics Report (Top {top_k} PDF)",
         data=pdf_data,
         file_name=f"MCDM_Consensus_Top_{top_k}_Report.pdf",
         type="primary"
